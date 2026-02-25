@@ -7,7 +7,7 @@ This project uses classification algorithms to analyze employee data and estimat
 ---
 
 ## 🚀 Live Demo
-(After deployment, paste your Streamlit link here)
+https://employee-attrition-prediction-system-7kbojddhzzhkurstugdxv7.streamlit.app/
 
 ---
 
