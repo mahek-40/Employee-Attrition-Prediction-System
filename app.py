@@ -10,8 +10,20 @@ st.set_page_config(
 )
 
 # ---- Load Model ---- #
-model = pickle.load(open("model/attrition_model.pkl", "rb"))
-model_columns = pickle.load(open("model/model_columns.pkl", "rb"))
+import streamlit as st
+import pandas as pd
+import os
+import pickle
+
+# ---- Load Model Safely ---- #
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+model_path = os.path.join(BASE_DIR, "model", "attrition_model.pkl")
+columns_path = os.path.join(BASE_DIR, "model", "model_columns.pkl")
+
+model = pickle.load(open(model_path, "rb"))
+model_columns = pickle.load(open(columns_path, "rb"))
 
 # ---- Title ---- #
 st.title("📊 Employee Attrition Prediction System")
