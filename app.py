@@ -10,7 +10,7 @@ st.set_page_config(page_title="Employee Attrition Predictor", layout="wide")
 # ---- Load Dataset ----
 @st.cache_data
 def load_data():
-    df = pd.read_csv("employee_attrition.csv")
+    df = pd.read_csv("data/employee_attrition.csv")
     return df
 
 df = load_data()
