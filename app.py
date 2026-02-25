@@ -3,49 +3,58 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 
 st.set_page_config(page_title="Employee Attrition Predictor", layout="wide")
-
 st.title("👩‍💼 Employee Attrition Prediction App")
 
-# -------------------------------
-# Load Dataset
-# -------------------------------
+# -----------------------------
+# Load Data
+# -----------------------------
 @st.cache_data
 def load_data():
     df = pd.read_csv("data/employee_attrition.csv")
     return df
 
 df = load_data()
-
-# -------------------------------
-# Preprocessing
-# -------------------------------
 df = df.dropna()
 
+# -----------------------------
+# Encode Data
+# -----------------------------
 df_encoded = pd.get_dummies(df, drop_first=True)
 
 X = df_encoded.drop("Attrition_Yes", axis=1)
 y = df_encoded["Attrition_Yes"]
 
-# -------------------------------
-# Train Model
-# -------------------------------
-@st.cache_resource
-def train_model(X, y):
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+# -----------------------------
+# Train/Test Split
+# -----------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
 
-    model = LogisticRegression(max_iter=1000)
-    model.fit(X_scaled, y)
+# -----------------------------
+# Train Model (Balanced)
+# -----------------------------
+@st.cache_resource
+def train_model(X_train, y_train):
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+
+    model = LogisticRegression(
+        max_iter=1000,
+        class_weight="balanced"   # 🔥 IMPORTANT FIX
+    )
+    model.fit(X_train_scaled, y_train)
 
     return model, scaler
 
-model, scaler = train_model(X, y)
+model, scaler = train_model(X_train, y_train)
 
-# -------------------------------
+# -----------------------------
 # Sidebar Inputs
-# -------------------------------
+# -----------------------------
 st.sidebar.header("Enter Employee Details")
 
 overtime = st.sidebar.selectbox("OverTime", ["Yes", "No"])
@@ -66,14 +75,11 @@ years_at_company = st.sidebar.number_input(
     value=3
 )
 
-job_satisfaction = st.sidebar.slider(
-    "Job Satisfaction (1-4)",
-    1, 4, 3
-)
+job_satisfaction = st.sidebar.slider("Job Satisfaction (1-4)", 1, 4, 3)
 
-# -------------------------------
-# Create Raw Input DataFrame
-# -------------------------------
+# -----------------------------
+# Create Input
+# -----------------------------
 raw_input = pd.DataFrame({
     "OverTime": [overtime],
     "MaritalStatus": [marital_status],
@@ -83,26 +89,20 @@ raw_input = pd.DataFrame({
     "JobSatisfaction": [job_satisfaction]
 })
 
-# Encode input same as training
 input_encoded = pd.get_dummies(raw_input)
-
-# Align columns with training data
 input_encoded = input_encoded.reindex(columns=X.columns, fill_value=0)
 
-# Scale input
 input_scaled = scaler.transform(input_encoded)
 
-# -------------------------------
+# -----------------------------
 # Prediction
-# -------------------------------
+# -----------------------------
 if st.button("Predict Attrition Risk"):
 
-    prediction = model.predict(input_scaled)[0]
     probability = model.predict_proba(input_scaled)[0][1]
 
     st.subheader("Prediction Result")
-
-    st.write(f"**Probability of Attrition:** {probability:.2f}")
+    st.write(f"Probability of Attrition: {probability:.2f}")
 
     if probability < 0.4:
         st.success("🟢 Low Risk of Attrition")
