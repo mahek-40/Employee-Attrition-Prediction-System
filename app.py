@@ -1,112 +1,76 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+import pickle
+import os
 
 st.set_page_config(page_title="Employee Attrition Predictor", layout="wide")
-st.title("👩‍💼 Employee Attrition Prediction App")
+
+st.title("👩‍💼 Employee Attrition Prediction")
 
 # -----------------------------
-# Load Data
+# Load Model + Columns
 # -----------------------------
-@st.cache_data
-def load_data():
-    df = pd.read_csv("data/employee_attrition.csv")
-    return df
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-df = load_data()
-df = df.dropna()
-
-# -----------------------------
-# Encode Data
-# -----------------------------
-df_encoded = pd.get_dummies(df, drop_first=True)
-
-X = df_encoded.drop("Attrition_Yes", axis=1)
-y = df_encoded["Attrition_Yes"]
-
-# -----------------------------
-# Train/Test Split
-# -----------------------------
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=5, random_state=42, stratify=y
-)
-
-# -----------------------------
-# Train Model (Balanced)
-# -----------------------------
-@st.cache_resource
-def train_model(X_train, y_train):
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-
-    model = LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced"   # 🔥 IMPORTANT FIX
-    )
-    model.fit(X_train_scaled, y_train)
-
-    return model, scaler
-
-model, scaler = train_model(X_train, y_train)
+model = pickle.load(open(os.path.join(BASE_DIR,"model","attrition_model.pkl"),"rb"))
+model_columns = pickle.load(open(os.path.join(BASE_DIR,"model","model_columns.pkl"),"rb"))
 
 # -----------------------------
 # Sidebar Inputs
 # -----------------------------
-st.sidebar.header("Enter Employee Details")
+st.sidebar.header("Employee Details")
 
-overtime = st.sidebar.selectbox("OverTime", ["Yes", "No"])
-marital_status = st.sidebar.selectbox("Marital Status", ["Single", "Married", "Divorced"])
-business_travel = st.sidebar.selectbox("Business Travel", ["Travel_Rarely", "Travel_Frequently", "Non-Travel"])
-
-monthly_income = st.sidebar.number_input(
-    "Monthly Income",
-    min_value=int(df["MonthlyIncome"].min()),
-    max_value=int(df["MonthlyIncome"].max()),
-    value=int(df["MonthlyIncome"].mean())
+overtime = st.sidebar.selectbox("OverTime", ["Yes","No"])
+marital_status = st.sidebar.selectbox(
+    "Marital Status",
+    ["Single","Married","Divorced"]
 )
 
-years_at_company = st.sidebar.number_input(
-    "Years At Company",
-    min_value=0,
-    max_value=int(df["YearsAtCompany"].max()),
-    value=3
+business_travel = st.sidebar.selectbox(
+    "Business Travel",
+    ["Travel_Rarely","Travel_Frequently","Non-Travel"]
 )
 
-job_satisfaction = st.sidebar.slider("Job Satisfaction (1-4)", 1, 4, 3)
+monthly_income = st.sidebar.slider("Monthly Income",1000,30000,8000)
+years_at_company = st.sidebar.slider("Years At Company",0,40,5)
+job_satisfaction = st.sidebar.slider("Job Satisfaction",1,4,3)
 
 # -----------------------------
-# Create Input
+# Create Full Feature Vector
 # -----------------------------
-raw_input = pd.DataFrame({
-    "OverTime": [overtime],
-    "MaritalStatus": [marital_status],
-    "BusinessTravel": [business_travel],
-    "MonthlyIncome": [monthly_income],
-    "YearsAtCompany": [years_at_company],
-    "JobSatisfaction": [job_satisfaction]
-})
+input_dict = {col:0 for col in model_columns}
 
-input_encoded = pd.get_dummies(raw_input)
-input_encoded = input_encoded.reindex(columns=X.columns, fill_value=0)
+# numeric
+if "MonthlyIncome" in input_dict:
+    input_dict["MonthlyIncome"] = monthly_income
 
-input_scaled = scaler.transform(input_encoded)
+if "YearsAtCompany" in input_dict:
+    input_dict["YearsAtCompany"] = years_at_company
+
+if "JobSatisfaction" in input_dict:
+    input_dict["JobSatisfaction"] = job_satisfaction
+
+# categorical encoding
+input_dict[f"OverTime_Yes"] = 1 if overtime=="Yes" else 0
+input_dict[f"MaritalStatus_{marital_status}"] = 1
+input_dict[f"BusinessTravel_{business_travel}"] = 1
+
+input_df = pd.DataFrame([input_dict])
 
 # -----------------------------
 # Prediction
 # -----------------------------
 if st.button("Predict Attrition Risk"):
 
-    probability = model.predict_proba(input_scaled)[0][1]
+    probability = model.predict_proba(input_df)[0][1]
 
-    st.subheader("Prediction Result")
-    st.write(f"Probability of Attrition: {probability:.2f}")
+    st.subheader("Result")
+
+    st.write(f"Attrition Probability: **{probability:.2f}**")
 
     if probability < 0.4:
-        st.success("🟢 Low Risk of Attrition")
+        st.success("🟢 Low Risk Employee")
     elif probability < 0.7:
-        st.warning("🟡 Medium Risk of Attrition")
+        st.warning("🟡 Medium Risk Employee")
     else:
-        st.error("🔴 High Risk of Attrition")
+        st.error("🔴 High Risk Employee")
